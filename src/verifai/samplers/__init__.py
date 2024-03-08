@@ -8,5 +8,6 @@ from .rejection import RejectionSampler, RejectionException
 from .bayesian_optimization import BayesOptSampler
 from .simulated_annealing import SimulatedAnnealingSampler
 from .scenic_sampler import ScenicSampler
+from .compositional_scenic_sampler import CompositionalScenicSampler
 from .grid_sampler import GridSampler
 from .dist_BO import DistBayesOptSampler

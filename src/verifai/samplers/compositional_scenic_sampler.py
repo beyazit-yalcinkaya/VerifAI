@@ -23,48 +23,66 @@ class CompositionalScenicSampler():
     @classmethod
     def fromScenicCode(cls, code, maxIterations=None, ignoredProperties=None, is_compositional=False, **kwargs):
         # Assumption: Compose block only consists of do statements.
-        # Assumption: Main scenario is the last one in the file
-        init_sub_scenarios = []
         code_lines = list(filter(lambda line: not line.lstrip().startswith("#"), code.split("\n")))
-        found_main = False
-        found_first_sub_scenarios = False
-        compose_line_idx = None
-        precondition_line_idx = None
+        main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx = cls._find_indices(code_lines)
+        init_sub_scenarios = []
         id_counter = 0
         previous_sub_scenarios = []
-        for line_idx in range(len(code_lines)):
+        for line_idx in range(main_start_line_idx, main_end_line_idx):
             line = code_lines[line_idx]
-            if not found_main:
-                line_list = line.split()
-                if len(line_list) > 1 and line_list[0] == "scenario" and line_list[1] == "Main():":
-                    found_main = True
-            else:
-                if line.lstrip().startswith("compose"):
-                    compose_line_idx = line_idx
-                if line.lstrip().startswith("precondition"):
-                    precondition_line_idx = line_idx
-                if line.lstrip().startswith("do"):
-                    line_list = line.split()
-                    sub_scenario_weight_tuple_list = None
-                    if len(line_list) > 1 and line_list[0] == "do" and line_list[1] == "choose":
-                        sub_scenario_weight_tuple_list, id_counter = cls._visit_do_choose(line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, id_counter)
-                    elif len(line_list) > 1 and line_list[0] == "do" and line_list[1] == "shuffle":
-                        sub_scenario_weight_tuple_list, id_counter = cls._visit_do_shuffle(line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, id_counter)
+            if line.lstrip().startswith("do"):
+                sub_scenario_weight_tuple_list, id_counter = cls._visit_do_statements(code_lines, line_idx, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, init_sub_scenarios != [], id_counter, maxIterations, ignoredProperties, kwargs)
+                if sub_scenario_weight_tuple_list is not None:
+                    if init_sub_scenarios == []:
+                        init_sub_scenarios.extend([(sub_scenario, 1.0) for sub_scenario, _ in sub_scenario_weight_tuple_list])
                     else:
-                        sub_scenario_weight_tuple_list, id_counter = cls._visit_do(line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, found_first_sub_scenarios, id_counter)
-                    if sub_scenario_weight_tuple_list is not None:
-                        for sub_scenario, weight in sub_scenario_weight_tuple_list:
-                            if not found_first_sub_scenarios:
-                                init_sub_scenarios.append((sub_scenario, 1.0))
-                            for previous_sub_scenario in previous_sub_scenarios:
-                                previous_sub_scenario.nexts.append((sub_scenario, weight))
-                        found_first_sub_scenarios = True
-                        previous_sub_scenarios = list([sub_scenario_weight_tuple[0] for sub_scenario_weight_tuple in sub_scenario_weight_tuple_list])
+                        for previous_sub_scenario in previous_sub_scenarios:
+                            previous_sub_scenario.nexts.extend(sub_scenario_weight_tuple_list)
+                    previous_sub_scenarios = list([sub_scenario for sub_scenario, _ in sub_scenario_weight_tuple_list])
         return cls(init_sub_scenarios=init_sub_scenarios)
 
     @classmethod
-    def _visit_do_choose(cls, line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, id_counter):
+    def _visit_do_statements(cls, code_lines, line_idx, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs):
+        line = code_lines[line_idx]
         line_list = line.split()
+        sub_scenario_weight_tuple_list = None
+        if len(line_list) > 1 and line_list[0] == "do" and line_list[1] == "choose":
+            sub_scenario_weight_tuple_list, id_counter = cls._visit_do_choose(line_list, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs)
+        elif len(line_list) > 1 and line_list[0] == "do" and line_list[1] == "shuffle":
+            sub_scenario_weight_tuple_list, id_counter = cls._visit_do_shuffle(line_list, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs)
+        else:
+            sub_scenario_weight_tuple_list, id_counter = cls._visit_do(line, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs)
+        return sub_scenario_weight_tuple_list, id_counter
+
+    @classmethod
+    def _find_indices(cls, code_lines):
+        compose_line_idx = None
+        precondition_line_idx = None
+        main_start_line_idx = None
+        main_end_line_idx = None
+        for line_idx in range(len(code_lines)):
+            line = code_lines[line_idx]
+            if not main_start_line_idx:
+                line_list = line.split()
+                if len(line_list) > 1 and line_list[0] == "scenario" and line_list[1] == "Main():":
+                    main_start_line_idx = line_idx
+            else:
+                if line.lstrip().startswith("compose"):
+                    compose_line_idx = line_idx
+                elif line.lstrip().startswith("precondition"):
+                    precondition_line_idx = line_idx
+                elif compose_line_idx and not line.lstrip().startswith("do"):
+                    main_end_line_idx = line_idx
+                    break
+        assert compose_line_idx is not None
+        assert precondition_line_idx is not None
+        assert main_start_line_idx is not None
+        assert main_end_line_idx is not None
+        assert main_start_line_idx < precondition_line_idx < compose_line_idx < main_end_line_idx
+        return main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx
+
+    @classmethod
+    def _visit_do_choose(cls, line_list, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs):
         sub_scenario_weight_tuple_list = []
         choose_scenarios_str = " ".join(line_list[2:]).replace("{", "").replace("}", "")
         choose_scenarios_str_list = re.split(r',\s*(?![^()]*\))', choose_scenarios_str)
@@ -74,7 +92,10 @@ class CompositionalScenicSampler():
                 choose_scenario_str, weight = choose_scenario_str.split(":")
                 weight = float(weight)
             # TODO: Fix tabs
-            partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + choose_scenario_str])
+            if found_first_sub_scenarios:
+                partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + choose_scenario_str] + code_lines[main_end_line_idx:])
+            else:
+                partial_code = "\n".join(code_lines[:compose_line_idx + 1] + ["        do " + choose_scenario_str] + code_lines[main_end_line_idx:])
             scenario = scenic.scenarioFromString(partial_code, **kwargs)
             sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
             sub_scenario = SubScenario(id=id_counter, sampler=sampler)
@@ -84,8 +105,7 @@ class CompositionalScenicSampler():
         return [(sub_scenario, weight/weight_sum) for sub_scenario, weight in sub_scenario_weight_tuple_list], id_counter
 
     @classmethod
-    def _visit_do_shuffle(cls, line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, id_counter):
-        line_list = line.split()
+    def _visit_do_shuffle(cls, line_list, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs):
         sub_scenario_weight_tuple_list = []
         shuffle_scenarios_str = " ".join(line_list[2:]).replace("{", "").replace("}", "")
         shuffle_scenarios_str_list = re.split(r',\s*(?![^()]*\))', shuffle_scenarios_str)
@@ -99,7 +119,10 @@ class CompositionalScenicSampler():
         n_perm = math.perm(len(shuffle_scenario_str_weight_tuple_list))
         for shuffle_scenario_str_weight_tuple_permutation in itertools.permutations(shuffle_scenario_str_weight_tuple_list):
             # TODO: Fix tabs
-            partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation])
+            if found_first_sub_scenarios:
+                partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation] + code_lines[main_end_line_idx:])
+            else:
+                partial_code = "\n".join(code_lines[:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation] + code_lines[main_end_line_idx:])
             scenario = scenic.scenarioFromString(partial_code, **kwargs)
             sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
             sub_scenario = SubScenario(id=id_counter, sampler=sampler)
@@ -109,11 +132,11 @@ class CompositionalScenicSampler():
         return sub_scenario_weight_tuple_list, id_counter
 
     @classmethod
-    def _visit_do(cls, line, code_lines, compose_line_idx, precondition_line_idx, maxIterations, ignoredProperties, kwargs, found_first_sub_scenarios, id_counter):
-        if not found_first_sub_scenarios == []:
-            partial_code = "\n".join(code_lines[:compose_line_idx + 1] + [line])
+    def _visit_do(cls, line, code_lines, main_start_line_idx, precondition_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs):
+        if found_first_sub_scenarios:
+            partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + [line] + code_lines[main_end_line_idx:])
         else:
-            partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + [line])
+            partial_code = "\n".join(code_lines[:compose_line_idx + 1] + [line] + code_lines[main_end_line_idx:])
         scenario = scenic.scenarioFromString(partial_code, **kwargs)
         sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
         sub_scenario = SubScenario(id=id_counter, sampler=sampler)

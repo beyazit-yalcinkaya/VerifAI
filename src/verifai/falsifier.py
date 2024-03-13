@@ -10,6 +10,8 @@ import progressbar
 from statsmodels.stats.proportion import proportion_confint
 import time
 
+import random
+
 def parallelized(server_class):
     if server_class == Server:
         return ParallelServer
@@ -23,6 +25,7 @@ class falsifier(ABC):
         self.sampler_type = sampler_type
         self.sampler = sampler
         self.samples = {}
+        self.last_states = {}
         self.monitor = monitor
 
         params = DotMap(
@@ -122,7 +125,7 @@ class falsifier(ABC):
         c = len(self.error_table.table)
         return proportion_confint(c, N, alpha=1 - confidence_level, method='beta')
 
-    def run_falsifier(self):
+    def run_falsifier(self, objects=None):
         i = 0
         ce_num = 0
         server_samples = []
@@ -150,7 +153,7 @@ class falsifier(ABC):
         try:
             while True:
                 try:
-                    sample, rho, timings = self.server.run_server()
+                    sample, rho, timings, last_state = self.server.run_server(objects)
                     self.total_sample_time += timings.sample_time
                     self.total_simulate_time += timings.simulate_time
                 except TerminationException:
@@ -160,6 +163,7 @@ class falsifier(ABC):
                 if self.verbosity >= 2:
                     print("Sample no: ", i, "\nSample: ", sample, "\nRho: ", rho)
                 self.samples[i] = sample
+                self.last_states[i] = last_state
                 server_samples.append(sample)
                 rhos.append(rho)
                 i += 1
@@ -252,11 +256,11 @@ class generic_parallel_falsifier(parallel_falsifier):
         self.server = server_class(self.num_workers, self.n_iters, sampling_data, self.scenic_path,
         self.monitor, options=server_options, max_time=self.max_time, sampler=self.sampler)
 
-    def run_falsifier(self):
+    def run_falsifier(self, objects=None):
         i = 0
         ce_num = 0
         try:
-            outputs = self.server.run_server()
+            outputs = self.server.run_server(objects)
         finally:
             self.server.terminate()
         samples, rhos = zip(*outputs)
@@ -276,3 +280,37 @@ class generic_parallel_falsifier(parallel_falsifier):
                     break
             elif self.save_safe_table:
                 self.populate_error_table(sample, rho, error=False)
+
+class compositional_falsifier():
+    def __init__(self,  monitor=None, sampler_type= None, sample_space=None, sampler=None,
+                 falsifier_params=None, server_options={}, server_class=ScenicServer):
+        assert sampler is not None
+        assert monitor is not None
+
+        self.init_sub_scenarios = sampler.init_sub_scenarios
+
+        sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
+        while sub_scenario_queue:
+            sub_scenario = sub_scenario_queue.pop()
+            if sub_scenario.falsifier is None:
+                sub_scenario.falsifier = generic_falsifier(monitor=monitor, sampler_type=sampler_type, sample_space=sample_space, sampler=sub_scenario.sampler, falsifier_params=falsifier_params, server_options=server_options, server_class=server_class)
+                for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
+                    sub_scenario_queue.append(next_sub_scenario)
+
+    def run_falsifier(self, init_states=None):
+        sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
+        while sub_scenario_queue:
+            sub_scenario = sub_scenario_queue.pop()
+
+            init_states = []
+            for s in sub_scenario.previous_sub_scenarios:
+                init_states.extend(s.last_states)
+
+            init_state = random.sample(init_states, 1)[0] if init_states else None
+
+            sub_scenario.falsifier.run_falsifier(init_state)
+
+            sub_scenario.last_states.extend(sub_scenario.falsifier.last_states.values())
+            for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
+                    sub_scenario_queue.append(next_sub_scenario)
+

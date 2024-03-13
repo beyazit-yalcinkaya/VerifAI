@@ -52,15 +52,29 @@ class ScenicServer(Server):
         else:
             self.simulator = defaults.simulator
 
-    def evaluate_sample(self, sample):
+    def evaluate_sample(self, sample, objects=None):
         scene = self.sampler.lastScene
         assert scene
+        if objects:
+            # TODO: Also write valeuse for sampled random variables. Check scenarios.py lines 306-312 in Scenic.
+            scene.objects = objects
+            scene.egoObject = objects[0]
         result = self._simulate(scene)
         if result is None:
-            return self.rejectionFeedback
+            return self.rejectionFeedback, None
         value = (0 if self.monitor is None
                  else self.monitor.evaluate(result))
-        return value
+        return value, result.result.last_state
+
+    def run_server(self, objects=None):
+        start = time.time()
+        sample = self.get_sample(self.lastValue)
+        after_sampling = time.time()
+        self.lastValue, lastState = self.evaluate_sample(sample, objects)
+        after_simulation = time.time()
+        timings = ServerTimings(sample_time=(after_sampling - start),
+                                simulate_time=(after_simulation - after_sampling))
+        return sample, self.lastValue, timings, lastState
 
     def _simulate(self, scene):
         startTime = time.time()

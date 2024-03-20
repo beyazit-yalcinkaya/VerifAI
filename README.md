@@ -1,3 +1,12 @@
+This is a fork of [VerifAI](https://github.com/berkeleyLearnVerify/verifAI/). The repository contains two prototype extensions to VerifAI. Once these extensions reach a stable performance, this fork will be merged with the original VerifAI repository. The repository extends VerifAI for the compositional falsification and statistical verification of Scenic scenarios, reducing analysis time by leveraging compositional structure of scenarios. This extension is based on our RV'23 paper [Compositional Simulation-Based Analysis of AI-Based Autonomous Systems for Markovian Specifications](https://link.springer.com/content/pdf/10.1007/978-3-031-44267-4_10.pdf?pdf=inline%20link). See our [example](examples/compositional_analysis/) for using the compositional analysis feature!
+
+<!--The extensions implemented in this repository are listed below.
+-->
+<!--* The repository contains a statistical verifier, enhancing capabilities of VerifAI beyond falsification. As of right now, the verifier can only be used with static sampling strategies. See our [example](examples/smc/) for using the statistical verifier.
+* It also extends VerifAI for the compositional falsification and statistical verification of Scenic scenarios, reducing analysis time by leveraging compositional structure of scenarios. This extension is based on our RV'23 paper [Compositional Simulation-Based Analysis of AI-Based Autonomous Systems for Markovian Specifications](https://link.springer.com/content/pdf/10.1007/978-3-031-44267-4_10.pdf?pdf=inline%20link). See our [example](examples/compositional_analysis/) for using the compositional analysis feature.-->
+
+----
+
 [![Documentation Status](https://readthedocs.org/projects/verifai/badge/?version=latest)](https://verifai.readthedocs.io/en/latest/?badge=latest)
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 

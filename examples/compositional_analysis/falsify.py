@@ -1,4 +1,3 @@
-
 import math
 import os.path
 import sys
@@ -15,7 +14,7 @@ from verifai.monitor import specification_monitor, mtl_specification
 if len(sys.argv) > 1:
     path = sys.argv[1]
 else:
-    path = os.path.join(os.path.dirname(__file__), 'newtonian/carlaChallenge2.scenic')
+    path = os.path.join(os.path.dirname(__file__), 'newtonian/intersection.scenic')
 
 
 def temp(sub_scenarios):

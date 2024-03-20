@@ -4,8 +4,6 @@ import scenic
 import itertools
 from verifai.samplers import ScenicSampler
 
-# TODO: For sub-scenarios that not init delete all global declaration, etc. SOLVED: Global declarations are ignored by Scenic when running a scenario.
-
 class SubScenario():
     def __init__(self, sampler, id, previous_sub_scenarios=[], next_sub_scenarios=[]):
         self.sampler = sampler
@@ -89,17 +87,13 @@ class CompositionalScenicSampler():
                     main_end_line_idx = line_idx
                     break
         assert main_start_line_idx is not None
-        assert invariant_line_idx is not None
-        assert precondition_line_idx is not None
-        assert setup_line_idx is not None
-        assert compose_line_idx is not None
         assert main_end_line_idx is not None
-        assert main_start_line_idx < precondition_line_idx
-        assert main_start_line_idx < invariant_line_idx
-        assert precondition_line_idx < setup_line_idx
-        assert invariant_line_idx < setup_line_idx
-        assert setup_line_idx < compose_line_idx
-        assert compose_line_idx < main_end_line_idx
+        assert (precondition_line_idx is None) or (main_start_line_idx < precondition_line_idx)
+        assert (invariant_line_idx is None) or (main_start_line_idx < invariant_line_idx)
+        assert (precondition_line_idx is None or setup_line_idx is None) or (precondition_line_idx < setup_line_idx)
+        assert (invariant_line_idx is None or setup_line_idx is None) or (invariant_line_idx < setup_line_idx)
+        assert (setup_line_idx is None or compose_line_idx is None) or (setup_line_idx < compose_line_idx)
+        assert (compose_line_idx is None) or (compose_line_idx < main_end_line_idx)
         return main_start_line_idx, precondition_line_idx, setup_line_idx, compose_line_idx, main_end_line_idx
 
     @classmethod
@@ -113,7 +107,7 @@ class CompositionalScenicSampler():
                 choose_scenario_str, weight = choose_scenario_str.split(":")
                 weight = float(weight)
             # TODO: Fix tabs
-            if found_first_sub_scenarios:
+            if found_first_sub_scenarios and precondition_line_idx:
                 # Do not include precondition line and setup lines
                 # partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + choose_scenario_str] + code_lines[main_end_line_idx:])
                 partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:setup_line_idx + 1] + ["        ego = new Object"] + code_lines[compose_line_idx: compose_line_idx + 1] + ["        do " + choose_scenario_str] + code_lines[main_end_line_idx:])
@@ -143,7 +137,7 @@ class CompositionalScenicSampler():
         n_perm = math.perm(len(shuffle_scenario_str_weight_tuple_list))
         for shuffle_scenario_str_weight_tuple_permutation in itertools.permutations(shuffle_scenario_str_weight_tuple_list):
             # TODO: Fix tabs
-            if found_first_sub_scenarios:
+            if found_first_sub_scenarios and precondition_line_idx:
                 # Do not include precondition line and setup lines
                 # partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation] + code_lines[main_end_line_idx:])
                 partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:setup_line_idx + 1] + ["        ego = new Object"] + code_lines[compose_line_idx:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation] + code_lines[main_end_line_idx:])
@@ -160,7 +154,7 @@ class CompositionalScenicSampler():
 
     @classmethod
     def _visit_do(cls, line, code_lines, main_start_line_idx, precondition_line_idx, setup_line_idx, compose_line_idx, main_end_line_idx, found_first_sub_scenarios, id_counter, maxIterations, ignoredProperties, kwargs):
-        if found_first_sub_scenarios:
+        if found_first_sub_scenarios and precondition_line_idx:
             # Do not include precondition line and setup lines
             # partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:compose_line_idx + 1] + [line] + code_lines[main_end_line_idx:])
             partial_code = "\n".join(code_lines[:precondition_line_idx] + code_lines[precondition_line_idx + 1:setup_line_idx + 1] + ["        ego = new Object"] + code_lines[compose_line_idx:compose_line_idx + 1] + [line] + code_lines[main_end_line_idx:])

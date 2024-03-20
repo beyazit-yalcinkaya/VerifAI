@@ -66,10 +66,11 @@ class ScenicServer(Server):
                 # Write the ego object.
                 scene.egoObject = objects[0]
                 # Write values for all sampled variables.
-                for i in scene.behaviorNamespaces["__main__"][2]:
-                    if (isinstance(scene.behaviorNamespaces["__main__"][2][i], Samplable) and
-                    not isinstance(behaviorNamespaces["__main__"][1][i], Samplable)):
-                        scene.behaviorNamespaces["__main__"][1][i] = behaviorNamespaces["__main__"][1][i]
+                if "__main__" in scene.behaviorNamespaces.keys() and len(scene.behaviorNamespaces["__main__"]) == 3:
+                    for i in scene.behaviorNamespaces["__main__"][2]:
+                        if (isinstance(scene.behaviorNamespaces["__main__"][2][i], Samplable) and
+                        not isinstance(behaviorNamespaces["__main__"][1][i], Samplable)):
+                            scene.behaviorNamespaces["__main__"][1][i] = behaviorNamespaces["__main__"][1][i]
                 # Write all parameters.
                 scene.params = params
         result = self._simulate(scene)

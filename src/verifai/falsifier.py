@@ -298,6 +298,7 @@ class compositional_falsifier():
                     sub_scenario_queue.append(next_sub_scenario)
 
     def run_falsifier(self):
+        # TODO: Collect results
         sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
         while sub_scenario_queue:
             sub_scenario = sub_scenario_queue.pop()

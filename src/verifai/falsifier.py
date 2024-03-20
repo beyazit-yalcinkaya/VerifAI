@@ -125,7 +125,7 @@ class falsifier(ABC):
         c = len(self.error_table.table)
         return proportion_confint(c, N, alpha=1 - confidence_level, method='beta')
 
-    def run_falsifier(self, objects=None):
+    def run_falsifier(self, init_state_generator=None):
         i = 0
         ce_num = 0
         server_samples = []
@@ -153,7 +153,7 @@ class falsifier(ABC):
         try:
             while True:
                 try:
-                    sample, rho, timings, last_state = self.server.run_server(objects)
+                    sample, rho, timings, last_state = self.server.run_server(init_state_generator)
                     self.total_sample_time += timings.sample_time
                     self.total_simulate_time += timings.simulate_time
                 except TerminationException:
@@ -256,11 +256,11 @@ class generic_parallel_falsifier(parallel_falsifier):
         self.server = server_class(self.num_workers, self.n_iters, sampling_data, self.scenic_path,
         self.monitor, options=server_options, max_time=self.max_time, sampler=self.sampler)
 
-    def run_falsifier(self, objects=None):
+    def run_falsifier(self):
         i = 0
         ce_num = 0
         try:
-            outputs = self.server.run_server(objects)
+            outputs = self.server.run_server()
         finally:
             self.server.terminate()
         samples, rhos = zip(*outputs)
@@ -297,7 +297,7 @@ class compositional_falsifier():
                 for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
                     sub_scenario_queue.append(next_sub_scenario)
 
-    def run_falsifier(self, init_states=None):
+    def run_falsifier(self):
         sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
         while sub_scenario_queue:
             sub_scenario = sub_scenario_queue.pop()
@@ -306,9 +306,22 @@ class compositional_falsifier():
             for s in sub_scenario.previous_sub_scenarios:
                 init_states.extend(s.last_states)
 
-            init_state = random.sample(init_states, 1)[0] if init_states else None
+            def sample_state(states):
+                index_lower_bound = 0
+                index_upper_bound = len(states) - 1
+                while True:
+                    try:
+                        if index_lower_bound > index_upper_bound:
+                            yield None
+                        else:
+                            index = random.randint(index_lower_bound, index_upper_bound)
+                            yield states[index]
+                    except GeneratorExit:
+                        return
 
-            sub_scenario.falsifier.run_falsifier(init_state)
+            init_state_generator = sample_state(init_states)
+
+            sub_scenario.falsifier.run_falsifier(init_state_generator)
 
             sub_scenario.last_states.extend(sub_scenario.falsifier.last_states.values())
             for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:

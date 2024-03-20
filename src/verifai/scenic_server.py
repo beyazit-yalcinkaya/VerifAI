@@ -16,6 +16,7 @@ from verifai.monitor import multi_objective_monitor
 from scenic.core.simulators import SimulationCreationError
 from scenic.core.external_params import VerifaiSampler
 from scenic.core.distributions import RejectionException
+from scenic.core.distributions import Samplable
 
 class ScenicServer(Server):
     """`Server` for use with dynamic Scenic scenarios.
@@ -52,13 +53,25 @@ class ScenicServer(Server):
         else:
             self.simulator = defaults.simulator
 
-    def evaluate_sample(self, sample, objects=None):
+    def evaluate_sample(self, sample, init_state_generator=None):
         scene = self.sampler.lastScene
         assert scene
-        if objects:
-            # TODO: Also write valeuse for sampled random variables. Check scenarios.py lines 306-312 in Scenic.
-            scene.objects = objects
-            scene.egoObject = objects[0]
+        if init_state_generator:
+            init_state = next(init_state_generator)
+            if init_state:
+                # Write values for sampled random variables and params. Similar to scenarios.py lines 306-312 in Scenic.
+                objects, behaviorNamespaces, params = init_state
+                # Write all objects. Since we are doing only decomposing Main, writing objects like this should be ok.
+                scene.objects = objects
+                # Write the ego object.
+                scene.egoObject = objects[0]
+                # Write values for all sampled variables.
+                for i in scene.behaviorNamespaces["__main__"][2]:
+                    if (isinstance(scene.behaviorNamespaces["__main__"][2][i], Samplable) and
+                    not isinstance(behaviorNamespaces["__main__"][1][i], Samplable)):
+                        scene.behaviorNamespaces["__main__"][1][i] = behaviorNamespaces["__main__"][1][i]
+                # Write all parameters.
+                scene.params = params
         result = self._simulate(scene)
         if result is None:
             return self.rejectionFeedback, None
@@ -66,11 +79,11 @@ class ScenicServer(Server):
                  else self.monitor.evaluate(result))
         return value, result.result.last_state
 
-    def run_server(self, objects=None):
+    def run_server(self, init_state_generator=None):
         start = time.time()
         sample = self.get_sample(self.lastValue)
         after_sampling = time.time()
-        self.lastValue, lastState = self.evaluate_sample(sample, objects)
+        self.lastValue, lastState = self.evaluate_sample(sample, init_state_generator)
         after_simulation = time.time()
         timings = ServerTimings(sample_time=(after_sampling - start),
                                 simulate_time=(after_simulation - after_sampling))

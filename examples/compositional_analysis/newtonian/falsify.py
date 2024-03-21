@@ -11,14 +11,19 @@ from verifai.falsifier import generic_falsifier, compositional_falsifier
 from verifai.monitor import specification_monitor, mtl_specification
 
 # Load the Scenic scenario and create a sampler from it
+is_compositional = False
 if len(sys.argv) > 1:
-    path = sys.argv[1]
+    mode = sys.argv[1]
+    assert mode in ["monolithic", "compositional"]
+    if mode == "compositional":
+        is_compositional = True
+
+path = os.path.join(os.path.dirname(__file__), 'intersection.scenic')
+
+if is_compositional:
+    sampler = CompositionalScenicSampler.fromScenario(path, mode2D=True)
 else:
-    path = os.path.join(os.path.dirname(__file__), 'newtonian/intersection.scenic')
-
-sampler = CompositionalScenicSampler.fromScenario(path, mode2D=True, is_compositional=True)
-
-# sampler = ScenicSampler.fromScenario(path, mode2D=True)
+    sampler = ScenicSampler.fromScenario(path, mode2D=True)
 
 # Define the specification (i.e. evaluation metric) as an MTL formula.
 # Our example spec will say that the ego object stays at least 5 meters away
@@ -53,20 +58,27 @@ falsifier_params = DotMap(
     save_safe_table=True
 )
 server_options = DotMap(maxSteps=100, verbosity=0)
-# falsifier = generic_falsifier(sampler=sampler,
-#                               monitor=MyMonitor(),
-#                               falsifier_params=falsifier_params,
-#                               server_class=ScenicServer,
-#                               server_options=server_options)
-falsifier = compositional_falsifier(sampler=sampler,
-                              monitor=MyMonitor(),
-                              falsifier_params=falsifier_params,
-                              server_class=ScenicServer,
-                              server_options=server_options)
-
-# Perform falsification and print the results
-falsifier.run_falsifier()
-falsifier.print_error_tables()
-falsifier.print_safe_tables()
-print(falsifier.get_rho())
+if is_compositional:
+    falsifier = compositional_falsifier(sampler=sampler,
+                                  monitor=MyMonitor(),
+                                  falsifier_params=falsifier_params,
+                                  server_class=ScenicServer,
+                                  server_options=server_options)
+    falsifier.run_falsifier()
+    print('Error table:')
+    falsifier.print_error_tables()
+    print('Safe table:')
+    falsifier.print_safe_tables()
+    print(falsifier.get_rho())
+else:
+    falsifier = generic_falsifier(sampler=sampler,
+                                  monitor=MyMonitor(),
+                                  falsifier_params=falsifier_params,
+                                  server_class=ScenicServer,
+                                  server_options=server_options)
+    falsifier.run_falsifier()
+    print('Error table:')
+    print(falsifier.error_table.table)
+    print('Safe table:')
+    print(falsifier.safe_table.table)
 

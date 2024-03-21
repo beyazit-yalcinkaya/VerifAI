@@ -18,13 +18,13 @@ class CompositionalScenicSampler():
         self.init_sub_scenarios = init_sub_scenarios
 
     @classmethod
-    def fromScenario(cls, path, maxIterations=None, ignoredProperties=None, is_compositional=False, **kwargs):
+    def fromScenario(cls, path, maxIterations=None, ignoredProperties=None, **kwargs):
         with open(path, "r") as file:
             code = file.read()
-        return cls.fromScenicCode(code=code, maxIterations=maxIterations, ignoredProperties=ignoredProperties, is_compositional=True, **kwargs)
+        return cls.fromScenicCode(code=code, maxIterations=maxIterations, ignoredProperties=ignoredProperties, **kwargs)
 
     @classmethod
-    def fromScenicCode(cls, code, maxIterations=None, ignoredProperties=None, is_compositional=False, **kwargs):
+    def fromScenicCode(cls, code, maxIterations=None, ignoredProperties=None, **kwargs):
         # Assumption: Compose block only consists of do statements.
         # Assumption: `ego` is declared in the setup block of main scenario.
         code_lines = list(filter(lambda line: not line.lstrip().startswith("#"), code.split("\n")))

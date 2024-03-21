@@ -287,6 +287,12 @@ class compositional_falsifier():
         assert sampler is not None
         assert monitor is not None
 
+        self.save_error_table = True
+        self.save_safe_table = True
+        if falsifier_params is not None:
+            self.save_error_table = falsifier_params.save_error_table
+            self.save_safe_table = falsifier_params.save_safe_table
+
         self.init_sub_scenarios = sampler.init_sub_scenarios
 
         sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
@@ -298,7 +304,6 @@ class compositional_falsifier():
                     sub_scenario_queue.append(next_sub_scenario)
 
     def run_falsifier(self):
-        # TODO: Collect results
         sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
         while sub_scenario_queue:
             sub_scenario = sub_scenario_queue.pop()
@@ -327,4 +332,53 @@ class compositional_falsifier():
             sub_scenario.last_states.extend(sub_scenario.falsifier.last_states.values())
             for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
                     sub_scenario_queue.append(next_sub_scenario)
+
+    def print_error_tables(self):
+        if self.save_error_table:
+            sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
+            while sub_scenario_queue:
+                sub_scenario = sub_scenario_queue.pop()
+                if sub_scenario.falsifier is not None:
+                    print(f"Error Table for {sub_scenario.id}")
+                    print(sub_scenario.falsifier.error_table.table)
+                    for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
+                        sub_scenario_queue.append(next_sub_scenario)
+
+    def print_safe_tables(self):
+        if self.save_safe_table:
+            sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
+            while sub_scenario_queue:
+                sub_scenario = sub_scenario_queue.pop()
+                if sub_scenario.falsifier is not None:
+                    print(f"Safe Table for {sub_scenario.id}")
+                    print(sub_scenario.falsifier.safe_table.table)
+                    for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
+                        sub_scenario_queue.append(next_sub_scenario)
+
+    def _get_rho_for_block(self, sub_scenarios):
+        # TODO: Use correct edge probs. Right now, we just assume uniform.
+        rhos = []
+        for sub_scenario in sub_scenarios:
+            if sub_scenario.falsifier is not None:
+                safe_count = len(sub_scenario.falsifier.safe_table.table.rho)
+                error_count = len(sub_scenario.falsifier.error_table.table.rho)
+                rho = safe_count/(safe_count + error_count)
+                rhos.append(rho)
+        return np.mean(rhos)
+
+
+    def get_rho(self):
+        if self.save_error_table and self.save_safe_table:
+            rho = 1.0
+            sub_scenario_queue = [sub_scenario for sub_scenario, _ in self.init_sub_scenarios]
+            while sub_scenario_queue:
+                rho *= self._get_rho_for_block(sub_scenario_queue)
+                temp = []
+                while sub_scenario_queue:
+                    sub_scenario = sub_scenario_queue.pop()
+                    for next_sub_scenario, _ in sub_scenario.next_sub_scenarios:
+                        temp.append(next_sub_scenario)
+                sub_scenario_queue = temp
+            return rho
+        return None
 

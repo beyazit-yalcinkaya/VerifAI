@@ -16,20 +16,7 @@ if len(sys.argv) > 1:
 else:
     path = os.path.join(os.path.dirname(__file__), 'newtonian/intersection.scenic')
 
-
-def temp(sub_scenarios):
-    next_sub_scenarios = []
-    print("----")
-    for i, _ in sub_scenarios:
-        print("id", i.id, "obj", i, "previouses", i.previous_sub_scenarios, "nexts", i.next_sub_scenarios, "falsifier", i.falsifier, "last_states", i.last_states)
-        next_sub_scenarios.extend(i.next_sub_scenarios)
-    if next_sub_scenarios:
-        temp(list(set(next_sub_scenarios)))
-
 sampler = CompositionalScenicSampler.fromScenario(path, mode2D=True, is_compositional=True)
-
-# temp(sampler.init_sub_scenarios)
-# input()
 
 # sampler = ScenicSampler.fromScenario(path, mode2D=True)
 
@@ -63,10 +50,7 @@ falsifier_params = DotMap(
     n_iters=2,
     verbosity=1,
     save_error_table=True,
-    save_safe_table=True,
-    # uncomment to save these tables to files; we'll print them out below
-    # error_table_path='error_table.csv',
-    # safe_table_path='safe_table.csv'
+    save_safe_table=True
 )
 server_options = DotMap(maxSteps=100, verbosity=0)
 # falsifier = generic_falsifier(sampler=sampler,
@@ -80,14 +64,9 @@ falsifier = compositional_falsifier(sampler=sampler,
                               server_class=ScenicServer,
                               server_options=server_options)
 
-# temp(sampler.init_sub_scenarios)
-# input()
-
 # Perform falsification and print the results
 falsifier.run_falsifier()
-# temp(sampler.init_sub_scenarios)
-# input()
-# print('Error table:')
-# print(falsifier.error_table.table)
-# print('Safe table:')
-# print(falsifier.safe_table.table)
+falsifier.print_error_tables()
+falsifier.print_safe_tables()
+print(falsifier.get_rho())
+

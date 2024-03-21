@@ -116,7 +116,7 @@ class CompositionalScenicSampler():
                 partial_code = "\n".join(code_lines[:compose_line_idx + 1] + ["        do " + choose_scenario_str] + code_lines[main_end_line_idx:])
             scenario = scenic.scenarioFromString(partial_code, **kwargs)
             sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
-            sub_scenario = SubScenario(id=id_counter, sampler=sampler)
+            sub_scenario = SubScenario(id=choose_scenario_str, sampler=sampler)
             id_counter += 1
             sub_scenario_weight_tuple_list.append((sub_scenario, weight))
         weight_sum = sum([sub_scenario_weight_tuple[1] for sub_scenario_weight_tuple in sub_scenario_weight_tuple_list])
@@ -146,7 +146,7 @@ class CompositionalScenicSampler():
                 partial_code = "\n".join(code_lines[:compose_line_idx + 1] + ["        do " + shuffle_scenario_str for shuffle_scenario_str, weight in shuffle_scenario_str_weight_tuple_permutation] + code_lines[main_end_line_idx:])
             scenario = scenic.scenarioFromString(partial_code, **kwargs)
             sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
-            sub_scenario = SubScenario(id=id_counter, sampler=sampler)
+            sub_scenario = SubScenario(id=shuffle_scenario_str, sampler=sampler)
             id_counter += 1
             # TODO: Compute exact probabilities later
             sub_scenario_weight_tuple_list.append((sub_scenario, 1.0/n_perm))
@@ -163,7 +163,7 @@ class CompositionalScenicSampler():
             partial_code = "\n".join(code_lines[:compose_line_idx + 1] + [line] + code_lines[main_end_line_idx:])
         scenario = scenic.scenarioFromString(partial_code, **kwargs)
         sampler = ScenicSampler(scenario, maxIterations=maxIterations, ignoredProperties=ignoredProperties)
-        sub_scenario = SubScenario(id=id_counter, sampler=sampler)
+        sub_scenario = SubScenario(id=line.split()[1], sampler=sampler)
         id_counter += 1
         return [(sub_scenario, 1.0)], id_counter
 
